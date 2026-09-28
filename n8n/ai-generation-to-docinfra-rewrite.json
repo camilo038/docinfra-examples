@@ -1,0 +1,171 @@
+{
+  "name": "AI generation to DocInfra rewrite",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "8d20f4fb-2783-5eef-951f-2c1bedb9a072",
+      "name": "When clicking 'Test workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5dae7770-ea3e-59ef-a390-69dd47deb3b2",
+              "name": "base_url",
+              "value": "https://api.apidocinfra.com",
+              "type": "string"
+            },
+            {
+              "id": "9ac08102-79b9-5a34-b259-d4ab4aa94b53",
+              "name": "text",
+              "value": "In today's fast-paced world, it is important to note that our Q3 campaign reached 48,200 visitors, a 23.5% increase over Q2. Moreover, the new pricing page will go live on November 3, 2026. You can read the full announcement at https://example.com/blog/q3-results and share it with your team.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "817aa822-088f-5c02-9eb6-a06a3d503bda",
+      "name": "AI-generated draft",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.base_url }}/v1/text/rewrite",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.text, mode: 'natural', intensity: 'medium', language: 'auto', preserve: { numbers: true, urls: true, emails: true, citations: true, code: true }, protected_terms: [] }) }}",
+        "options": {}
+      },
+      "id": "296d1d51-c04d-52bb-b2a8-cd1d670d467e",
+      "name": "DocInfra text rewrite",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "DocInfra API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dd438b43-5a1e-5faf-8c92-6f26c5a85191",
+              "name": "rewritten_text",
+              "value": "={{ $json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "dbce0916-0c44-5cd3-80df-17fbbc6f6146",
+              "name": "rewrite_id",
+              "value": "={{ $json.rewrite_id }}",
+              "type": "string"
+            },
+            {
+              "id": "dc029367-9509-57a8-9d7a-46a37f73d567",
+              "name": "changed_percent",
+              "value": "={{ $json.metrics.changed_percent }}",
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "479ea586-d4e0-5e6f-bc34-65ea2b8661de",
+      "name": "Extract rewritten text",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "da85986e-1a33-5593-8ab0-f5592a8d1093",
+      "name": "Downstream app (CMS, email, database)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "When clicking 'Test workflow'": {
+      "main": [
+        [
+          {
+            "node": "AI-generated draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI-generated draft": {
+      "main": [
+        [
+          {
+            "node": "DocInfra text rewrite",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DocInfra text rewrite": {
+      "main": [
+        [
+          {
+            "node": "Extract rewritten text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract rewritten text": {
+      "main": [
+        [
+          {
+            "node": "Downstream app (CMS, email, database)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "tags": []
+}

@@ -1,0 +1,545 @@
+{
+  "info": {
+    "_postman_id": "5b0c7f3e-2d1a-4c8e-9a61-3f2b7d9e0c41",
+    "name": "DocInfra API v1",
+    "description": "Collection for the DocInfra API v1: text and DOCX rewrite, DOCX and HTML to PDF conversion, jobs, documents, usage, plan and webhooks.\n\n## Quickstart\n\n1. Create a free account at https://app.apidocinfra.com.\n2. In the dashboard, create an API key (`doc_test_...` or `doc_live_...`). It is shown once.\n3. Select the **DocInfra** environment and paste the key into `DOCINFRA_API_KEY`. Every request sends it as `Authorization: Bearer {{DOCINFRA_API_KEY}}`.\n\nThen send **Text Rewrite > Rewrite text**. For files, send a conversion or a DOCX rewrite (`202`), then **Jobs > Get job** until `status` is `completed`. `job_id`, `document_id` and `webhook_id` are stored automatically from the responses.\n\n## Preservation guarantee\n\nNumbers, percentages, money, dates, URLs, emails, citations, code and your `protected_terms` never reach the model: they are replaced by markers before the call and each marker has to come back exactly once and in the same order. If that cannot be achieved in two attempts, `POST /v1/text/rewrite` answers `422 PRESERVATION_FAILED` and returns no text, and a document rewrite job ends `failed` with the same code without delivering a document. Accuracy is never traded for a rewrite.\n\nErrors are `application/problem+json` with a stable `code`; decide on `code`, not on `title` or `detail`. Every response carries `X-Request-Id`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{DOCINFRA_API_KEY}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Idempotency-Key is required on these two endpoints (docs: API v1).",
+          "const required = ['/v1/documents/convert', '/v1/documents/rewrite'];",
+          "const path = '/' + pm.request.url.path.join('/');",
+          "if (pm.request.method === 'POST' && required.includes(path) && !pm.request.headers.has('Idempotency-Key')) {",
+          "    pm.request.headers.add({ key: 'Idempotency-Key', value: 'pm-' + pm.variables.replaceIn('{{$guid}}') });",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const path = '/' + pm.request.url.path.join('/');",
+          "let body = null;",
+          "try { body = pm.response.json(); } catch (e) { }",
+          "if (pm.response.code === 202 && body && body.job_id) {",
+          "    pm.collectionVariables.set('job_id', body.job_id);",
+          "    if (body.document_id) pm.collectionVariables.set('document_id', body.document_id);",
+          "}",
+          "if (pm.request.method === 'POST' && path === '/v1/webhooks' && body && body.webhook_id) {",
+          "    pm.collectionVariables.set('webhook_id', body.webhook_id);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.apidocinfra.com",
+      "type": "string"
+    },
+    {
+      "key": "job_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "document_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "webhook_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Text Rewrite",
+      "description": "Synchronous rewrite of plain text. Beta.",
+      "item": [
+        {
+          "name": "Rewrite text",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/text/rewrite",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "text",
+                "rewrite"
+              ]
+            },
+            "description": "Rewrites a text so it reads naturally, keeping its meaning, its language and every protected element (numbers, dates, URLs, emails, citations, code and `protected_terms`). Synchronous.\n\nExpect `200` with the rewritten `text` and `metrics`. `Idempotency-Key` is optional here; add it by hand if you want safe retries (a replay within one hour returns the same response with `Idempotent-Replayed: true`).\n\nIf protection cannot be guaranteed the API answers `422 PRESERVATION_FAILED` and returns no text. Status: beta, enabled per workspace (`403 REWRITE_NOT_ENABLED` otherwise).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"It is important to note that Northwind Analytics closed Q3 with revenue of $2.4 million, up 18.5% from Q2. In today's fast-paced market, the board will review these results on October 15, 2026. The full report is available at https://example.com/reports/q3-2026 for all stakeholders.\",\n  \"mode\": \"professional\",\n  \"intensity\": \"medium\",\n  \"language\": \"auto\",\n  \"preserve\": {\n    \"numbers\": true,\n    \"urls\": true,\n    \"emails\": true,\n    \"citations\": true,\n    \"code\": true\n  },\n  \"protected_terms\": [\n    \"Northwind Analytics\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK (response shape)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/v1/text/rewrite",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "v1",
+                    "text",
+                    "rewrite"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"text\": \"It is important to note that Northwind Analytics closed Q3 with revenue of $2.4 million, up 18.5% from Q2. In today's fast-paced market, the board will review these results on October 15, 2026. The full report is available at https://example.com/reports/q3-2026 for all stakeholders.\",\n  \"mode\": \"professional\",\n  \"intensity\": \"medium\",\n  \"language\": \"auto\",\n  \"preserve\": {\n    \"numbers\": true,\n    \"urls\": true,\n    \"emails\": true,\n    \"citations\": true,\n    \"code\": true\n  },\n  \"protected_terms\": [\n    \"Northwind Analytics\"\n  ]\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-store"
+                },
+                {
+                  "key": "X-Request-Id",
+                  "value": "req_01M37FG04YE9ZR5X18TP0BWM5Y"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"rewrite_id\": \"rwr_01J9Z3F8Q6W2XK4B7C9D0E1F2G\",\n  \"text\": \"Northwind Analytics closed Q3 with revenue of $2.4 million, 18.5% above Q2. The board will review these results on October 15, 2026. The full report is at https://example.com/reports/q3-2026.\",\n  \"language\": \"en\",\n  \"mode\": \"professional\",\n  \"intensity\": \"medium\",\n  \"metrics\": {\n    \"input_words\": 47,\n    \"output_words\": 32,\n    \"changed_percent\": 41.2\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Document Rewrite",
+      "description": "Asynchronous rewrite of a DOCX. Returns a job. Beta.",
+      "item": [
+        {
+          "name": "Rewrite DOCX",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/documents/rewrite",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "documents",
+                "rewrite"
+              ]
+            },
+            "description": "Uploads a `.docx` and queues a rewrite of its prose. The result is a DOCX with the same structure (styles, lists, tables, links, images, headers and footers). Asynchronous.\n\nExpect `202` with `job_id` and `document_id`; the collection stores both. Then poll **Jobs > Get job** until `status` is `completed` and download `download_url`.\n\n`Idempotency-Key` is required; the pre-request script adds a random one. Pick the file in the `file` field before sending. Macro-enabled documents are rejected with `415`. Status: beta, enabled per workspace.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "A .docx up to 25 MB"
+                },
+                {
+                  "key": "mode",
+                  "value": "professional",
+                  "type": "text"
+                },
+                {
+                  "key": "intensity",
+                  "value": "medium",
+                  "type": "text"
+                },
+                {
+                  "key": "language",
+                  "value": "auto",
+                  "type": "text"
+                },
+                {
+                  "key": "protected_terms",
+                  "value": "Northwind Analytics, Q3",
+                  "type": "text",
+                  "description": "Comma separated"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Document Conversion",
+      "description": "DOCX or HTML to PDF. Returns a job.",
+      "item": [
+        {
+          "name": "Convert DOCX to PDF",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/documents/convert",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "documents",
+                "convert"
+              ]
+            },
+            "description": "Uploads a DOCX and queues its conversion to PDF. The request returns right away; the worker converts it.\n\nExpect `202` with `job_id`, `document_id` and `status: queued`; the collection stores the ids. Poll **Jobs > Get job** until `completed`.\n\n`Idempotency-Key` is required; the pre-request script adds a random one. Pick the file in the `file` field before sending.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "DOCX up to 25 MB"
+                },
+                {
+                  "key": "output_format",
+                  "value": "pdf",
+                  "type": "text",
+                  "description": "Only pdf is accepted (default)"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Convert HTML to PDF",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/documents/convert",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "documents",
+                "convert"
+              ]
+            },
+            "description": "Same as the DOCX request with an `.html` file.\n\nExpect `202` with `job_id` and `document_id`.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "HTML file up to 25 MB"
+                },
+                {
+                  "key": "output_format",
+                  "value": "pdf",
+                  "type": "text"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Jobs",
+      "description": "Job status and download URL.",
+      "item": [
+        {
+          "name": "Get job",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/jobs/{{job_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "jobs",
+                "{{job_id}}"
+              ]
+            },
+            "description": "Returns the job status: `queued`, `processing`, `completed`, `failed` or `rejected`. `type` is `convert` or `rewrite`.\n\nExpect `200`. When `status` is `completed` the body has `download_url` (valid 5 minutes, a new one on every call). Download it with a plain `GET` and no headers; do not send the API key to the storage URL. On `failed` or `rejected` the body has `error.code` and `error.message`.\n\n`job_id` is filled automatically from the last `202` response."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "description": "List, read and delete documents.",
+      "item": [
+        {
+          "name": "List documents",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/documents?limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "documents"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "processed",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lists your documents, newest first. Optional query parameters: `limit` (1 to 100, default 20), `status` (`received`, `processed`, `failed`, `rejected`) and `cursor` (the `next_cursor` of the previous page).\n\nExpect `200`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get document",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/documents/{{document_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "documents",
+                "{{document_id}}"
+              ]
+            },
+            "description": "Returns one document. When it is processed, not deleted and not expired, the body includes `download_url` and `download_url_expires_at`.\n\nExpect `200`, or `404 DOCUMENT_NOT_FOUND`."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete document",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/documents/{{document_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "documents",
+                "{{document_id}}"
+              ]
+            },
+            "description": "Deletes the stored files of a document (original and result). Repeating it is safe.\n\nExpect `204` with no body. `409 DOCUMENT_IN_PROGRESS` while the job is still `queued` or `processing`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Usage",
+      "item": [
+        {
+          "name": "Get usage",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/usage",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "usage"
+              ],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "2026-09",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Usage for one month: operations, successful, failed and rejected jobs, bytes, and words for `text_rewrite` and `document_rewrite`. Optional `period` in `YYYY-MM` (current UTC month by default).\n\nExpect `200`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Plan",
+      "item": [
+        {
+          "name": "Get plan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/plan",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "plan"
+              ]
+            },
+            "description": "The plan of the workspace that owns the API key, its limits for the billing period and what has been used (`meters`). `limit: -1` means no limit. Read only; subscriptions are managed in the dashboard.\n\nExpect `200`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "description": "Register endpoints for document events. Signature verification is described in the webhooks guide.",
+      "item": [
+        {
+          "name": "Create webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/webhooks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "webhooks"
+              ]
+            },
+            "description": "Registers an HTTPS endpoint for document events: `document.completed`, `document.failed`, `document.rejected`, `document.deleted`.\n\nExpect `201`. The response includes `secret` (`whsec_...`) only this once: store it to verify signatures. The collection stores `webhook_id`. `Idempotency-Key` is optional; a replay with the same key and body returns `200` without `secret`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.org/hooks/docinfra\",\n  \"events\": [\n    \"document.completed\",\n    \"document.failed\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List webhooks",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/webhooks",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "webhooks"
+              ]
+            },
+            "description": "Lists active webhook endpoints. Never includes `secret`.\n\nExpect `200`."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete webhook",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/v1/webhooks/{{webhook_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "v1",
+                "webhooks",
+                "{{webhook_id}}"
+              ]
+            },
+            "description": "Deletes a webhook endpoint and cancels its pending deliveries. Repeating it is safe.\n\nExpect `204` with no body."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
